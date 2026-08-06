@@ -159,8 +159,11 @@ func (sre *SnapshotRestoreEngine) createPVC(
 	vb *harvesterv1.VolumeBackup,
 	vsName string,
 ) error {
-	pvc := sre.buildPVC(vmr, vr, vb, vsName)
-	_, err := sre.pvcClient.Create(pvc)
+	pvc, err := sre.buildPVC(vmr, vr, vb, vsName)
+	if err != nil {
+		return err
+	}
+	_, err = sre.pvcClient.Create(pvc)
 	return err
 }
 
@@ -169,14 +172,20 @@ func (sre *SnapshotRestoreEngine) buildPVC(
 	vr *harvesterv1.VolumeRestore,
 	vb *harvesterv1.VolumeBackup,
 	vsName string,
-) *corev1.PersistentVolumeClaim {
+) (*corev1.PersistentVolumeClaim, error) {
 	pvcName := sre.vmro.GetVolRestorePVCName(vr)
 	namespace := sre.vmro.GetNamespace(vmr)
 	pvcSpec := sre.vmbo.GetVolBackupPVCSpec(vb)
 	annotations := sre.buildAnnotations(vmr, vb)
 	labels := sre.buildLabels(vb)
 
-	return pvchelper.BuildPVCFromSnapshot(namespace, pvcName, vsName, labels, annotations, pvcSpec)
+	vs, err := sre.vsCache.Get(namespace, vsName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get VolumeSnapshot %s/%s: %w", namespace, vsName, err)
+	}
+	pvcSpec.Resources = pvchelper.ResolvePVCResources(pvcSpec, vs)
+
+	return pvchelper.BuildPVCFromSnapshot(namespace, pvcName, vsName, labels, annotations, pvcSpec), nil
 }
 
 func (sre *SnapshotRestoreEngine) buildAnnotations(

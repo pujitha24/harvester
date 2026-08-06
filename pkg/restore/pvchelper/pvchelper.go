@@ -46,6 +46,24 @@ func BuildPVCFromSnapshot(
 	}
 }
 
+// ResolvePVCResources returns the resource requirements to request for a PVC being
+// restored from vs. Longhorn recalculates the minimum restorable size against the
+// source volume's CURRENT size, so a volume expanded after the snapshot was taken
+// reports a larger vs.Status.RestoreSize than the historical PVC spec captured at
+// backup time. Requesting the stale historical size then fails Longhorn's "size of
+// target volume is different than size of source volume" verification. Falls back to
+// the historical spec's resources if the snapshot has no RestoreSize yet.
+func ResolvePVCResources(pvcSpec corev1.PersistentVolumeClaimSpec, vs *snapshotv1.VolumeSnapshot) corev1.VolumeResourceRequirements {
+	if vs != nil && vs.Status != nil && vs.Status.RestoreSize != nil {
+		return corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: *vs.Status.RestoreSize,
+			},
+		}
+	}
+	return pvcSpec.Resources
+}
+
 // CheckPVCStatus validates the PVC status and returns appropriate errors
 func CheckPVCStatus(pvc *corev1.PersistentVolumeClaim) error {
 	if pvc.Status.Phase == corev1.ClaimPending {
