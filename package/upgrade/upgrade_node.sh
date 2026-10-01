@@ -546,14 +546,17 @@ generate_networkmanager_config() {
         sed -i 's%PERSISTENT_STATE_PATHS:.*/var/lib/wicked%& /var/lib/NetworkManager /etc/NetworkManager%' $CUSTOM90_FILE
         local updated_paths_line=$(grep 'PERSISTENT_STATE_PATHS:.*/var/lib/wicked' $CUSTOM90_FILE)
         if ! [[ "$updated_paths_line" =~ "/var/lib/NetworkManager" ]]; then
-          echo "Failed to add /var/lib/NetworkManager to PERSISTENT_STATE_PATHS in $CUSTOM90_FILE"
+          echo "Failed to add /var/lib/NetworkManager to PERSISTENT_STATE_PATHS in $CUSTOM90_FILE" >&2
+          exit 1
         fi
       fi
     else
-      echo "Unable to find expected PERSISTENT_STATE_PATHS line in $CUSTOM90_FILE"
+      echo "Unable to find expected PERSISTENT_STATE_PATHS line in $CUSTOM90_FILE" >&2
+      exit 1
     fi
   else
-    echo "File not found: $CUSTOM90_FILE"
+    echo "File not found: $CUSTOM90_FILE" >&2
+    exit 1
   fi
 
   echo "Generating NetworkManager config..."
